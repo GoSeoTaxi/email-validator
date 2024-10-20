@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package emailvalidator;
+
+option go_package = "./;pb";
+
+import "google/api/annotations.proto";
+
+service EmailValidator {
+  rpc ValidateEmail(ValidateEmailRequest) returns (ValidateEmailResponse) {
+    option (google.api.http) = {
+      post: "/v1/validate"
+      body: "*"
+    };
+  }
+}
+
+message ValidateEmailRequest {
+  string email = 1;
+}
+
+message ValidateEmailResponse {
+  bool is_valid = 1;
+  string message = 2;
+}

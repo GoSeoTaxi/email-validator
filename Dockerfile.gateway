@@ -1,0 +1,35 @@
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /app
+
+RUN apk add --no-cache git protobuf make wget
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
+
+RUN mkdir -p proto/googleapis/google/api proto/googleapis/google/protobuf && \
+    wget -O proto/googleapis/google/protobuf/descriptor.proto https://raw.githubusercontent.com/protocolbuffers/protobuf/master/src/google/protobuf/descriptor.proto && \
+    wget -O proto/googleapis/google/api/annotations.proto https://raw.githubusercontent.com/googleapis/googleapis/master/google/api/annotations.proto && \
+    wget -O proto/googleapis/google/api/http.proto https://raw.githubusercontent.com/googleapis/googleapis/master/google/api/http.proto
+
+ENV PATH="$PATH:/root/go/bin"
+
+RUN make generate
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o gateway cmd/gateway/main.go
+
+FROM alpine:latest
+
+WORKDIR /root/
+
+COPY --from=builder /app/gateway .
+
+EXPOSE 8080
+
+CMD ["./gateway"]

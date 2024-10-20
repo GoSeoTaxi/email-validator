@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:6.0-alpine
+    container_name: redis
+    networks:
+      - app-network
+    command: ["redis-server", "--maxmemory", "101mb", "--maxmemory-policy", "allkeys-lru"]
+
+  email-validator:
+    build:
+      context: .
+      dockerfile: Dockerfile.email-validator
+    image: email-validator:latest
+    container_name: email-validator
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_MAXMEMORY=100mb
+      - GRPC_PORT=50051
+      - DNS_HOSTS=1.1.1.1,1.0.0.1,8.8.8.8
+    networks:
+      - app-network
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    image: email-gateway:latest
+    container_name: email-gateway
+    ports:
+      - "80:8080"
+    depends_on:
+      - email-validator
+    environment:
+      - GRPC_SERVER_ENDPOINT=email-validator:50051
+      - HTTP_PORT=8080
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
